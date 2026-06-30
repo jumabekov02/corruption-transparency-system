@@ -20,3 +20,6 @@ dist/
 
 # Project: keep agent instructions out of version control
 CLAUDE.md
+
+# Personal local-only files
+ROADMAP.md

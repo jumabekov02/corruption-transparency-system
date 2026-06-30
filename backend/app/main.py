@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, bids, contractors, departments, tenders
+from app.api.v1 import auth, bids, contractors, contracts, departments, tenders
 from app.core.config import settings
 
 # The FastAPI application object. Uvicorn looks for this (app.main:app).
@@ -36,3 +36,4 @@ app.include_router(departments.router, prefix="/api/v1")
 app.include_router(contractors.router, prefix="/api/v1")
 app.include_router(tenders.router, prefix="/api/v1")
 app.include_router(bids.router, prefix="/api/v1")
+app.include_router(contracts.router, prefix="/api/v1")

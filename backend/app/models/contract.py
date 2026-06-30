@@ -1,11 +1,16 @@
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, Enum, ForeignKey, Numeric
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import ContractStatus
+
+if TYPE_CHECKING:
+    from app.models.indicator import Indicator
+    from app.models.risk_score import RiskScore
 
 
 class Contract(Base):
@@ -27,3 +32,7 @@ class Contract(Base):
     status: Mapped[ContractStatus] = mapped_column(
         Enum(ContractStatus), default=ContractStatus.in_progress, nullable=False
     )
+
+    # Read-only navigation to the risk results (written by the risk engine).
+    risk_score: Mapped["RiskScore | None"] = relationship(viewonly=True, uselist=False)
+    indicators: Mapped[list["Indicator"]] = relationship(viewonly=True)
