@@ -14,6 +14,7 @@ from app.models.enums import BidStatus, IndicatorType, RiskBand
 from app.models.indicator import Indicator
 from app.models.risk_score import RiskScore
 from app.models.tender import Tender
+from app.services.ml_anomaly import build_feature_row, fit_and_score
 from app.services.risk_engine import ContractRiskInput, compute_indicators, fuse
 
 WINDOW_DAYS = 730  # ~24 months for the repeated-winner look-back
@@ -60,9 +61,9 @@ def _gather(db: Session, contract: Contract) -> tuple[ContractRiskInput, Tender]
     return ctx, tender
 
 
-def score_contract(db: Session, contract: Contract) -> None:
-    """Compute and persist Indicator rows + the RiskScore for one contract."""
-    ctx, tender = _gather(db, contract)
+def _persist(db: Session, contract: Contract, ctx: ContractRiskInput, tender: Tender,
+             ml_anomaly: float | None) -> None:
+    """Compute indicators + fuse + write the Indicator rows and RiskScore."""
     indicators = compute_indicators(ctx)
 
     # Awarding-phase evidence (distinct from the rule signals).
@@ -72,7 +73,7 @@ def score_contract(db: Session, contract: Contract) -> None:
         if c2.get("flagged_bid_ids"):
             award_flags["awarded_after_exclusions"] = True
 
-    outcome = fuse(indicators, ml_anomaly=None, award_flags=award_flags)
+    outcome = fuse(indicators, ml_anomaly=ml_anomaly, award_flags=award_flags)
 
     # Replace any previous results for this contract.
     db.execute(delete(Indicator).where(Indicator.contract_id == contract.id))
@@ -101,10 +102,28 @@ def score_contract(db: Session, contract: Contract) -> None:
     )
 
 
+def score_contract(db: Session, contract: Contract, ml_anomaly: float | None = None) -> None:
+    """Score a single contract (used outside the batch path)."""
+    ctx, tender = _gather(db, contract)
+    _persist(db, contract, ctx, tender, ml_anomaly)
+
+
 def recompute_all(db: Session) -> int:
-    """Re-score every contract. Returns how many were scored."""
+    """Re-score every contract. Fits the ML anomaly model once over the whole
+    dataset, then fuses each contract's rule scores with its ML score."""
     contracts = db.scalars(select(Contract)).all()
+
+    gathered = []
+    feature_rows = []
     for contract in contracts:
-        score_contract(db, contract)
+        ctx, tender = _gather(db, contract)
+        gathered.append((contract, ctx, tender))
+        feature_rows.append(build_feature_row(ctx))
+
+    ml_scores = fit_and_score(feature_rows)  # one model fit over all contracts
+
+    for (contract, ctx, tender), ml in zip(gathered, ml_scores):
+        _persist(db, contract, ctx, tender, ml)
+
     db.commit()
     return len(contracts)
