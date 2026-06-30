@@ -3,8 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.contractor import Contractor
+from app.models.user import User
 from app.schemas.contractor import ContractorCreate, ContractorRead, ContractorUpdate
 
 router = APIRouter(prefix="/contractors", tags=["contractors"])
@@ -16,7 +18,11 @@ def list_contractors(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ContractorRead, status_code=status.HTTP_201_CREATED)
-def create_contractor(payload: ContractorCreate, db: Session = Depends(get_db)):
+def create_contractor(
+    payload: ContractorCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
     contractor = Contractor(**payload.model_dump())
     db.add(contractor)
     try:
@@ -41,7 +47,12 @@ def get_contractor(contractor_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{contractor_id}", response_model=ContractorRead)
-def update_contractor(contractor_id: int, payload: ContractorUpdate, db: Session = Depends(get_db)):
+def update_contractor(
+    contractor_id: int,
+    payload: ContractorUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
     contractor = db.get(Contractor, contractor_id)
     if contractor is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contractor not found")
@@ -59,7 +70,11 @@ def update_contractor(contractor_id: int, payload: ContractorUpdate, db: Session
 
 
 @router.delete("/{contractor_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_contractor(contractor_id: int, db: Session = Depends(get_db)):
+def delete_contractor(
+    contractor_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
     contractor = db.get(Contractor, contractor_id)
     if contractor is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contractor not found")

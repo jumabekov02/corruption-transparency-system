@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models.department import Department
+from app.models.user import User
 from app.schemas.department import DepartmentCreate, DepartmentRead, DepartmentUpdate
 
 # A router groups related endpoints. prefix => every path here starts with /departments.
@@ -22,7 +24,11 @@ def list_departments(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=DepartmentRead, status_code=status.HTTP_201_CREATED)
-def create_department(payload: DepartmentCreate, db: Session = Depends(get_db)):
+def create_department(
+    payload: DepartmentCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),  # only admins may create
+):
     # payload is already validated by Pydantic. model_dump() -> a plain dict of its fields.
     department = Department(**payload.model_dump())
     db.add(department)       # stage the new row
@@ -40,7 +46,12 @@ def get_department(department_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{department_id}", response_model=DepartmentRead)
-def update_department(department_id: int, payload: DepartmentUpdate, db: Session = Depends(get_db)):
+def update_department(
+    department_id: int,
+    payload: DepartmentUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
     department = db.get(Department, department_id)
     if department is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
@@ -53,7 +64,11 @@ def update_department(department_id: int, payload: DepartmentUpdate, db: Session
 
 
 @router.delete("/{department_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_department(department_id: int, db: Session = Depends(get_db)):
+def delete_department(
+    department_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
     department = db.get(Department, department_id)
     if department is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")

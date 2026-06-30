@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # --- Frontend origin allowed to call this API (CORS) ---
     backend_cors_origins: str = "http://localhost:5173"
 
+    # --- JWT authentication ---
+    jwt_secret_key: str = "dev-only-change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60
+
     @property
     def database_url(self) -> str:
         """The connection string SQLAlchemy will use to reach Postgres."""
